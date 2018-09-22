@@ -43,7 +43,7 @@ class AddCustomDomainViewController: UIViewController, UITextFieldDelegate {
         inputLabel.textColor = UIConstants.colors.settingsTextLabel
         view.addSubview(inputLabel)
 
-        textInput.backgroundColor = UIConstants.colors.cellBackground
+        textInput.backgroundColor = UIConstants.colors.urlTextBackground
         textInput.keyboardType = .URL
         textInput.autocapitalizationType = .none
         textInput.autocorrectionType = .no
@@ -109,6 +109,10 @@ class AddCustomDomainViewController: UIViewController, UITextFieldDelegate {
 
     private func finish() {
         delegate?.addCustomDomainViewControllerDidFinish(self)
-        self.navigationController?.popViewController(animated: true)
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            dismiss(animated: true, completion: nil)
+        } else {
+            self.navigationController?.popViewController(animated: true)
+        }
     }
 }

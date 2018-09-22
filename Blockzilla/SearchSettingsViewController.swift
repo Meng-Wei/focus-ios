@@ -17,7 +17,7 @@ class SearchSettingsViewController: UITableViewController {
     
     init(searchEngineManager: SearchEngineManager) {
         self.searchEngineManager = searchEngineManager
-        super.init(style: .grouped)
+        super.init(nibName: nil, bundle: nil)
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -41,30 +41,18 @@ class SearchSettingsViewController: UITableViewController {
         cell.textLabel?.text = " "
         cell.backgroundColor = UIConstants.colors.background
         
-        if section == 0 {
-            let label = SmartLabel()
-            label.text = UIConstants.strings.InstalledSearchEngines
-            label.textColor = UIConstants.colors.tableSectionHeader
-            label.font = UIConstants.fonts.tableSectionHeader
-            cell.contentView.addSubview(label)
-            
-            label.snp.makeConstraints { make in
-                make.leading.trailing.equalTo(cell.textLabel!)
-                make.centerY.equalTo(cell.textLabel!).offset(3)
-            }
+        let label = SmartLabel()
+        label.text = UIConstants.strings.InstalledSearchEngines
+        label.textColor = UIConstants.colors.tableSectionHeader
+        label.font = UIConstants.fonts.tableSectionHeader
+        cell.contentView.addSubview(label)
+        
+        label.snp.makeConstraints { make in
+            make.leading.trailing.equalTo(cell.textLabel!)
+            make.centerY.equalTo(cell.textLabel!).offset(3)
         }
 
         return cell
-    }
-    
-    override func numberOfSections(in tableView: UITableView) -> Int {
-        if isInEditMode {
-            return 1
-        }
-        else {
-            return 2
-        }
-        
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -72,12 +60,8 @@ class SearchSettingsViewController: UITableViewController {
         if isInEditMode { // NOTE: This is false when a user is swiping to delete but tableView.isEditing is true
             return numberOfEngines
         }
-        switch section {
-        case 1:
-            return 1
-        default:
-            return numberOfEngines + 1
-        }
+        
+        return numberOfEngines + 2 // 1 Add search engine row, 1 Restore default search engines row
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -86,26 +70,38 @@ class SearchSettingsViewController: UITableViewController {
             let cell = UITableViewCell(style: .default, reuseIdentifier: "addSearchEngine")
             cell.textLabel?.text = UIConstants.strings.AddSearchEngineButton
             cell.textLabel?.textColor = UIConstants.colors.settingsTextLabel
-            cell.backgroundColor = UIConstants.colors.cellBackground
+            cell.backgroundColor = UIConstants.colors.background
             cell.accessibilityIdentifier = "addSearchEngine"
             cell.selectedBackgroundView = getBackgroundView()
             return cell
-        } else if indexPath.section == 1 && indexPath.row == 0 {
+        } else if indexPath.item > engines.count {
             let cell = UITableViewCell(style: .default, reuseIdentifier: "restoreDefaultEngines")
-            cell.textLabel?.text = UIConstants.strings.RestoreSearchEnginesLabel
-            cell.textLabel?.font = UIFont.systemFont(ofSize: 17)
-            cell.textLabel?.numberOfLines = 0
-            cell.textLabel?.lineBreakMode = .byWordWrapping
-            cell.backgroundColor = UIConstants.colors.cellBackground
+            let label = SmartLabel()
+            label.text = UIConstants.strings.RestoreSearchEnginesLabel
+            label.font = UIFont.systemFont(ofSize: 17)
+            label.textColor = UIConstants.colors.settingsTextLabel
+            label.numberOfLines = 0
+            label.lineBreakMode = .byWordWrapping
+
+            cell.textLabel?.text = " "
+            cell.backgroundColor = UIConstants.colors.background
             cell.accessibilityIdentifier = "restoreDefaults"
             cell.selectedBackgroundView = getBackgroundView()
+            cell.addSubview(label)
+            label.snp.makeConstraints({ (make) in
+                make.topMargin.equalTo(44)
+                make.centerY.equalTo(66)
+                make.leading.equalTo(cell.textLabel!)
+                make.trailing.equalTo(cell.textLabel!)
+                make.bottom.equalTo(cell.snp.bottom)
+            })
             
             if searchEngineManager.hasDisabledDefaultEngine() {
-                cell.textLabel?.textColor = UIConstants.colors.settingsTextLabel
+                label.textColor = UIConstants.colors.settingsTextLabel
                 cell.selectionStyle = .default
                 cell.isUserInteractionEnabled = true
             } else {
-                cell.textLabel?.textColor = UIConstants.colors.settingsDisabled
+                label.textColor = UIConstants.colors.settingsDisabled
                 cell.selectionStyle = .none
                 cell.isUserInteractionEnabled = false
             }
@@ -118,7 +114,7 @@ class SearchSettingsViewController: UITableViewController {
             cell.textLabel?.textColor = UIConstants.colors.settingsTextLabel
             cell.imageView?.image = engine.image?.createScaled(size: CGSize(width: 24, height: 24))
             cell.selectedBackgroundView = getBackgroundView()
-            cell.backgroundColor = UIConstants.colors.cellBackground
+            cell.backgroundColor = UIConstants.colors.background
             cell.accessibilityIdentifier = engine.name
             
             if tableView.isEditing {
@@ -130,13 +126,6 @@ class SearchSettingsViewController: UITableViewController {
                     make.leading.equalTo(50)
                     make.centerY.equalTo(cell)
                 })
-                
-                if let imageView = cell.imageView {
-                    cell.textLabel?.snp.makeConstraints({ (make) in
-                        make.centerY.equalTo(imageView.snp.centerY)
-                        make.leading.equalTo(imageView.snp.trailing).offset(10)
-                    })
-                }
             }
 
             if engine === searchEngineManager.activeEngine {
@@ -144,7 +133,7 @@ class SearchSettingsViewController: UITableViewController {
                 
                 if tableView.isEditing {
                     cell.textLabel?.textColor = UIConstants.colors.settingsDisabled.withAlphaComponent(0.5)
-                    cell.separatorInset = UIEdgeInsets.init(top: 0, left: 93, bottom: 0, right: 0)
+                    cell.separatorInset = UIEdgeInsetsMake(0, 93, 0, 0)
                     cell.tintColor = tableView.tintColor.withAlphaComponent(0.5)
                     cell.imageView?.alpha = 0.5
                 }
@@ -167,7 +156,7 @@ class SearchSettingsViewController: UITableViewController {
             // Add search engine tapped
             let vc = AddSearchEngineViewController(delegate: self, searchEngineManager: searchEngineManager)
             navigationController?.pushViewController(vc, animated: true)
-        } else if indexPath.section == 1 {
+        } else if indexPath.item > engines.count {
             // Restore default engines tapped
             if searchEngineManager.hasDisabledDefaultEngine() {
                 searchEngineManager.restoreDisabledDefaultEngines()
@@ -195,7 +184,7 @@ class SearchSettingsViewController: UITableViewController {
         return engine != searchEngineManager.activeEngine
     }
     
-    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
             searchEngineManager.removeEngine(engine:searchEngineManager.engines[indexPath.row])
             tableView.reloadData()

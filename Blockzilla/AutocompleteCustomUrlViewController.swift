@@ -96,6 +96,20 @@ extension AutocompleteCustomUrlViewController: UITableViewDataSource {
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         let cell = UITableViewCell()
         cell.backgroundColor = UIConstants.colors.background
+
+        // Hack to cover header separator line
+        let footer = UIView()
+        footer.backgroundColor = UIConstants.colors.background
+
+        cell.addSubview(footer)
+        cell.sendSubview(toBack: footer)
+
+        footer.snp.makeConstraints { make in
+            make.height.equalTo(1)
+            make.bottom.equalToSuperview().offset(1)
+            make.leading.trailing.equalToSuperview()
+        }
+
         return cell
     }
 
@@ -119,7 +133,7 @@ extension AutocompleteCustomUrlViewController: UITableViewDataSource {
             cell.accessibilityIdentifier = domains[indexPath.row]
         }
 
-        cell.backgroundColor = UIConstants.colors.cellBackground
+        cell.backgroundColor = UIConstants.colors.background
         cell.textLabel?.textColor = UIConstants.colors.settingsTextLabel
         cell.layoutMargins = UIEdgeInsets.zero
 
@@ -136,11 +150,25 @@ extension AutocompleteCustomUrlViewController: UITableViewDataSource {
         if indexPath.row == domains.count {
             let viewController = AddCustomDomainViewController(autocompleteSource: customAutocompleteSource)
             viewController.delegate = self
-            self.navigationController?.pushViewController(viewController, animated: true)
+
+            // Present the ViewController modallu on the iPad
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                let navigationController = UINavigationController(rootViewController: viewController)
+                navigationController.modalPresentationStyle = .formSheet
+                let navigationBar = navigationController.navigationBar
+                navigationBar.isTranslucent = false
+                navigationBar.barTintColor = UIConstants.colors.background
+                navigationBar.tintColor = UIConstants.colors.navigationButton
+                navigationBar.titleTextAttributes = [NSAttributedStringKey.foregroundColor: UIConstants.colors.navigationTitle]
+
+                present(navigationController, animated: true, completion: nil)
+            } else {
+                self.navigationController?.pushViewController(viewController, animated: true)
+            }
         }
     }
 
-    func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+    func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
             tableView.beginUpdates()
             _ = customAutocompleteSource.remove(at: indexPath.row)

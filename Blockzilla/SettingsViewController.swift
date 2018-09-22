@@ -7,11 +7,9 @@ import SnapKit
 import UIKit
 import Telemetry
 import LocalAuthentication
-import Intents
-import IntentsUI
 
 class SettingsTableViewCell: UITableViewCell {
-    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+    override init(style: UITableViewCellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
 
         let backgroundColorView = UIView()
@@ -24,9 +22,9 @@ class SettingsTableViewCell: UITableViewCell {
     }
 }
 
-class SettingsTableViewAccessoryCell: SettingsTableViewCell {
+class SettingsTableViewSearchCell: SettingsTableViewCell {
     private let newLabel = SmartLabel()
-    let accessoryLabel = SmartLabel()
+    private let accessoryLabel = SmartLabel()
     private let spacerView = UIView()
 
     var accessoryLabelText: String? {
@@ -37,7 +35,7 @@ class SettingsTableViewAccessoryCell: SettingsTableViewCell {
         }
     }
 
-    var labelText: String? {
+    var label: String? {
         get { return newLabel.text }
         set {
             newLabel.text = newValue
@@ -45,7 +43,7 @@ class SettingsTableViewAccessoryCell: SettingsTableViewCell {
         }
     }
 
-    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+    override init(style: UITableViewCellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         newLabel.numberOfLines = 0
         newLabel.lineBreakMode = .byWordWrapping
@@ -90,42 +88,46 @@ class SettingsTableViewAccessoryCell: SettingsTableViewCell {
 
 class SettingsViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     enum Section: String {
-        case privacy, search, siri, integration, mozilla
+        case search, integration, privacy, security, performance, mozilla
         
         var numberOfRows: Int {
             switch self {
-            case .privacy:
-                if BiometryType(context: LAContext()).hasBiometry { return 4 }
-                return 3
             case .search: return 2
-            case .siri: return 3
             case .integration: return 1
-            case .mozilla: return 2
+            case .privacy: return 4
+            case .security: return 1
+            case .performance: return 1
+            case .mozilla: return 3
             }
         }
         
-        var headerText: String? {
+        var headerText: String {
             switch self {
-            case .privacy: return UIConstants.strings.toggleSectionPrivacy
             case .search: return UIConstants.strings.settingsSearchTitle
-            case .siri: return UIConstants.strings.siriShortcutsTitle
-            case .integration: return UIConstants.strings.toggleSectionSafari
+            case .integration: return UIConstants.strings.toggleSectionIntegration
+            case .privacy: return UIConstants.strings.toggleSectionPrivacy
+            case .security: return UIConstants.strings.toggleSectionSecurity
+            case .performance: return UIConstants.strings.toggleSectionPerformance
             case .mozilla: return UIConstants.strings.toggleSectionMozilla
             }
         }
-
-        static func getSections() -> [Section] {
-            if #available(iOS 12.0, *) {
-                return [.privacy, .search, .siri, integration, .mozilla]
+        
+        var hasFooter: Bool {
+            switch self {
+            case .privacy, .mozilla: return true
+            case .search, .integration, .security, .performance: return false
             }
-            else {
-                return [.privacy, .search, integration, .mozilla]
-            }
+        }
+        
+        static func getSections(deviceHasBiometrics: Bool) -> [Section] {
+            var sections: [Section] = [.search, integration, privacy, .performance, .mozilla]
+            if deviceHasBiometrics { sections.insert(.security, at: 3) }
+            
+            return sections
         }
     }
     
     
-
     enum BiometryType {
         enum Status {
             case hasIdentities
@@ -178,40 +180,18 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
     private var highlightsButton: UIBarButtonItem?
     private let whatsNew: WhatsNewDelegate
     private lazy var sections = {
-        Section.getSections()
+        Section.getSections(deviceHasBiometrics: biometryType.hasBiometry)
     }()
-
-    private var toggles = [Int : BlockerToggle]()
-
-    private var initialToggles : [Int : BlockerToggle]  {
-        let blockFontsToggle = BlockerToggle(label: UIConstants.strings.labelBlockFonts, setting: SettingsToggle.blockFonts)
-        let usageDataSubtitle = String(format: UIConstants.strings.detailTextSendUsageData, AppInfo.productName)
-        let usageDataToggle = BlockerToggle(label: UIConstants.strings.labelSendAnonymousUsageData, setting: SettingsToggle.sendAnonymousUsageData, subtitle: usageDataSubtitle)
-        let safariToggle = BlockerToggle(label: UIConstants.strings.toggleSafari, setting: SettingsToggle.safari)
-        var toggles = [Int : BlockerToggle]()
-        if let biometricToggle = createBiometricLoginToggleIfAvailable() {
-            toggles = [
-                1: blockFontsToggle,
-                2: biometricToggle,
-                3: usageDataToggle,
-                6: safariToggle
-            ]
-        }
-        else {
-            toggles = [
-                1: blockFontsToggle,
-                2: usageDataToggle,
-                5: safariToggle
-            ]
-        }
-        if #available(iOS 12.0, *) {
-            if let safariRow = toggles.first(where: { $1 == safariToggle })?.key {
-                toggles.removeValue(forKey: safariRow)
-                toggles[(safariRow +  Section.siri.numberOfRows)] = safariToggle
-            }
-        }
-        return toggles
-    }
+    
+    private var toggles = [
+        BlockerToggle(label: UIConstants.strings.toggleSafari, setting: SettingsToggle.safari),
+        BlockerToggle(label: UIConstants.strings.labelBlockAds, setting: SettingsToggle.blockAds, subtitle: UIConstants.strings.labelBlockAdsDescription),
+        BlockerToggle(label: UIConstants.strings.labelBlockAnalytics, setting: SettingsToggle.blockAnalytics, subtitle: UIConstants.strings.labelBlockAnalyticsDescription),
+        BlockerToggle(label: UIConstants.strings.labelBlockSocial, setting: SettingsToggle.blockSocial, subtitle: UIConstants.strings.labelBlockSocialDescription),
+        BlockerToggle(label: UIConstants.strings.labelBlockOther, setting: SettingsToggle.blockOther, subtitle: UIConstants.strings.labelBlockOtherDescription),
+        BlockerToggle(label: UIConstants.strings.labelBlockFonts, setting: SettingsToggle.blockFonts),
+        BlockerToggle(label: UIConstants.strings.labelSendAnonymousUsageData, setting: SettingsToggle.sendAnonymousUsageData),
+    ]
 
     /// Used to calculate cell heights.
     private lazy var dummyToggleCell: UITableViewCell = {
@@ -220,14 +200,12 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
         return cell
     }()
 
-    private var shouldScrollToSiri: Bool
-    init(searchEngineManager: SearchEngineManager, whatsNew: WhatsNewDelegate, shouldScrollToSiri: Bool = false) {
+    init(searchEngineManager: SearchEngineManager, whatsNew: WhatsNewDelegate) {
         self.searchEngineManager = searchEngineManager
         self.whatsNew = whatsNew
-        self.shouldScrollToSiri = shouldScrollToSiri
         super.init(nibName: nil, bundle: nil)
 
-        tableView.register(SettingsTableViewAccessoryCell.self, forCellReuseIdentifier: "accessoryCell")
+        tableView.register(SettingsTableViewSearchCell.self, forCellReuseIdentifier: "searchCell")
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -241,22 +219,9 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
 
         let navigationBar = navigationController!.navigationBar
         navigationBar.isTranslucent = false
-        navigationBar.barTintColor = UIConstants.colors.settingsNavBar
+        navigationBar.barTintColor = UIConstants.colors.background
         navigationBar.tintColor = UIConstants.colors.navigationButton
-        navigationBar.titleTextAttributes = [.foregroundColor: UIConstants.colors.navigationTitle]
-        
-        let navBarBorderRect = CGRect(x: 0.0, y: 0.0, width: 1.0, height: 0.25)
-        UIGraphicsBeginImageContextWithOptions(navBarBorderRect.size, false, 0.0)
-        UIConstants.colors.settingsNavBorder.setFill()
-        UIRectFill(navBarBorderRect)
-        if let borderImage = UIGraphicsGetImageFromCurrentImageContext() {
-            UIGraphicsEndImageContext()
-            navigationController?.navigationBar.shadowImage = borderImage
-        }
-        
-        let doneButton = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(dismissSettings))
-        doneButton.tintColor = UIConstants.Photon.Magenta60
-        navigationItem.leftBarButtonItem = doneButton
+        navigationBar.titleTextAttributes = [NSAttributedStringKey.foregroundColor: UIConstants.colors.navigationTitle]
 
         highlightsButton = UIBarButtonItem(title: UIConstants.strings.whatsNewTitle, style: .plain, target: self, action: #selector(whatsNewClicked))
         highlightsButton?.image = UIImage(named: "highlight")
@@ -264,7 +229,7 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
         navigationItem.rightBarButtonItem = highlightsButton
         
         if whatsNew.shouldShowWhatsNew() {
-            highlightsButton?.tintColor = UIConstants.colors.whatsNew
+            highlightsButton?.tintColor = UIConstants.colors.settingsLink
         }
 
         view.addSubview(tableView)
@@ -280,31 +245,23 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
         tableView.allowsSelection = true
         tableView.estimatedRowHeight = 44
 
-        toggles = initialToggles
-        for (i, blockerToggle) in toggles {
+        createBiometricLoginToggle()
+        
+        toggles.forEach { blockerToggle in
             let toggle = blockerToggle.toggle
             toggle.onTintColor = UIConstants.colors.toggleOn
+            toggle.tintColor = UIConstants.colors.toggleOff
             toggle.addTarget(self, action: #selector(toggleSwitched(_:)), for: .valueChanged)
             toggle.isOn = Settings.getToggle(blockerToggle.setting)
-            toggles[i] = blockerToggle
         }
 
-        NotificationCenter.default.addObserver(self, selector: #selector(applicationDidBecomeActive), name: UIApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(applicationDidBecomeActive), name: NSNotification.Name.UIApplicationDidBecomeActive, object: nil)
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         updateSafariEnabledState()
         tableView.reloadData()
-        if shouldScrollToSiri {
-            guard let siriSection = sections.index(where: {$0 == Section.siri}) else {
-                shouldScrollToSiri = false
-                return
-            }
-            let siriIndexPath = IndexPath(row: 0, section: siriSection)
-            tableView.scrollToRow(at: siriIndexPath, at: .none , animated: false)
-            shouldScrollToSiri = false
-        }
     }
 
     @objc private func applicationDidBecomeActive() {
@@ -320,8 +277,8 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
         return .lightContent
     }
     
-    fileprivate func createBiometricLoginToggleIfAvailable() -> BlockerToggle? {
-        guard biometryType.hasBiometry else { return nil }
+    func createBiometricLoginToggle() {
+        guard biometryType.hasBiometry else { return }
         
         let label: String
         let subtitle: String
@@ -335,21 +292,70 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
                 subtitle = String(format: UIConstants.strings.labelTouchIDLoginDescription, AppInfo.productName)
             default:
                 // Unknown biometric type
-                return nil
+                return
         }
         
         let toggle = BlockerToggle(label: label, setting: SettingsToggle.biometricLogin, subtitle: subtitle)
         toggle.toggle.isEnabled = biometryType.hasIdentities
-        return toggle
+        
+        toggles.insert(toggle, at: 5)
     }
 
     fileprivate func toggleForIndexPath(_ indexPath: IndexPath) -> BlockerToggle {
         var index = (indexPath as NSIndexPath).row
-        for i in 0..<(indexPath as NSIndexPath).section {
+        for i in 1..<(indexPath as NSIndexPath).section {
             index += tableView.numberOfRows(inSection: i)
         }
-        guard let toggle = toggles[index] else { return BlockerToggle(label: "Error", setting: SettingsToggle.blockAds) }
-        return toggle
+        
+        return toggles[index]
+    }
+
+    func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
+        let section = sections[section]
+        
+        switch section {
+            case .privacy, .mozilla:
+                let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+                
+                let subtitle: NSMutableAttributedString
+                let accessabilityIdentifier: String
+                let selector: Selector
+                
+                if case .mozilla = section {
+                    accessabilityIdentifier = "SettingsViewController.learnMoreCell"
+                    subtitle = NSMutableAttributedString(string: String(format: UIConstants.strings.detailTextSendUsageData, AppInfo.productName), attributes: [NSAttributedStringKey.foregroundColor : UIConstants.colors.settingsDetailLabel])
+                    selector = #selector(tappedLearnMoreFooter)
+                } else {
+                    accessabilityIdentifier = "SettingsViewController.trackingProtectionLearnMoreCell"
+                    subtitle = NSMutableAttributedString(string: String(format: UIConstants.strings.trackersDescriptionLabel, AppInfo.productName), attributes: [NSAttributedStringKey.foregroundColor : UIConstants.colors.settingsDetailLabel])
+                    selector = #selector(tappedTrackingProtectionLearnMoreFooter)
+                }
+                
+                let learnMore = NSAttributedString(string: UIConstants.strings.learnMore, attributes: [NSAttributedStringKey.foregroundColor : UIConstants.colors.toggleOn])
+                let space = NSAttributedString(string: " ", attributes: [NSAttributedStringKey.foregroundColor : UIConstants.colors.toggleOn])
+                subtitle.append(space)
+                subtitle.append(learnMore)
+                
+                cell.detailTextLabel?.attributedText = subtitle
+                cell.detailTextLabel?.numberOfLines = 0
+                cell.accessibilityIdentifier = accessabilityIdentifier
+                cell.selectionStyle = .none
+                cell.backgroundColor = UIConstants.colors.background
+                cell.layoutMargins = UIEdgeInsets.zero
+                
+                let tapGesture = UITapGestureRecognizer(target: self, action: selector)
+                cell.addGestureRecognizer(tapGesture)
+                
+                return cell
+            default:
+                return nil
+        }
+    }
+
+    @objc func tappedTrackingProtectionLearnMoreFooter(sender: UIGestureRecognizer) {
+        guard let url = SupportUtils.URLForTopic(topic: "tracking-protection-focus-ios") else { return }
+        let contentViewController = SettingsContentViewController(url: url)
+        navigationController?.pushViewController(contentViewController, animated: true)
     }
 
     @objc func tappedLearnMoreFooter(gestureRecognizer: UIGestureRecognizer) {
@@ -358,11 +364,15 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
         navigationController?.pushViewController(contentViewController, animated: true)
     }
 
+    func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
+        return sections[section].hasFooter ? 50 : 0
+    }
+
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         var cell: UITableViewCell
         switch sections[indexPath.section] {
         case .search:
-            guard let searchCell = tableView.dequeueReusableCell(withIdentifier: "accessoryCell") as? SettingsTableViewAccessoryCell else { fatalError("Accessory cells do not exist") }
+            guard let searchCell = tableView.dequeueReusableCell(withIdentifier: "searchCell") as? SettingsTableViewSearchCell else { fatalError("No Search Cells!") }
 
             let label = indexPath.row == 0 ? UIConstants.strings.settingsSearchLabel : UIConstants.strings.settingsAutocompleteSection
             let autocompleteLabel = Settings.getToggle(.enableDomainAutocomplete) || Settings.getToggle(.enableCustomDomainAutocomplete) ? UIConstants.strings.autocompleteCustomEnabled : UIConstants.strings.autocompleteCustomDisabled
@@ -370,48 +380,20 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
             let identifier = indexPath.row == 0 ? "SettingsViewController.searchCell" : "SettingsViewController.autocompleteCell"
 
             searchCell.accessoryLabelText = accessoryLabel
-            searchCell.labelText = label
+            searchCell.label = label
+            searchCell.accessoryType = .disclosureIndicator
             searchCell.accessibilityIdentifier = identifier
 
             cell = searchCell
-        case .siri:
-            guard #available(iOS 12.0, *), let siriCell = tableView.dequeueReusableCell(withIdentifier: "accessoryCell") as? SettingsTableViewAccessoryCell else { fatalError("No accessory cells") }
-            if indexPath.row == 0 {
-                siriCell.labelText = UIConstants.strings.eraseSiri
-                siriCell.accessibilityIdentifier = "settingsViewController.siriEraseCell"
-                SiriShortcuts().hasAddedActivity(type: .erase) { (result: Bool) in
-                    siriCell.accessoryLabel.text = result ? UIConstants.strings.Edit : UIConstants.strings.addToSiri
-                }
-            } else if indexPath.row == 1 {
-                    siriCell.labelText = UIConstants.strings.eraseAndOpenSiri
-                    siriCell.accessibilityIdentifier = "settingsViewController.siriEraseAndOpenCell"
-                    SiriShortcuts().hasAddedActivity(type: .eraseAndOpen) { (result: Bool) in
-                        siriCell.accessoryLabel.text = result ? UIConstants.strings.Edit : UIConstants.strings.addToSiri
-                    }
-            } else {
-                siriCell.labelText = UIConstants.strings.openUrlSiri
-                siriCell.accessibilityIdentifier = "settingsViewController.siriOpenURLCell"
-                SiriShortcuts().hasAddedActivity(type: .openURL) { (result: Bool) in
-                    siriCell.accessoryLabel.text = result ? UIConstants.strings.Edit : UIConstants.strings.add
-                }
-            }
-            cell = siriCell
-        case .mozilla:
-            if indexPath.row == 0 {
+        default:
+            if sections[indexPath.section] == .mozilla && indexPath.row == 1 {
                 cell = SettingsTableViewCell(style: .subtitle, reuseIdentifier: "aboutCell")
                 cell.textLabel?.text = String(format: UIConstants.strings.aboutTitle, AppInfo.productName)
                 cell.accessibilityIdentifier = "settingsViewController.about"
-            } else {
+            } else if sections[indexPath.section] == .mozilla && indexPath.row == 2 {
                 cell = SettingsTableViewCell(style: .subtitle, reuseIdentifier: "ratingCell")
                 cell.textLabel?.text = String(format: UIConstants.strings.ratingSetting, AppInfo.productName)
                 cell.accessibilityIdentifier = "settingsViewController.rateFocus"
-            }
-        default:
-            if sections[indexPath.section] == .privacy && indexPath.row == 0 {
-                cell = SettingsTableViewCell(style: .subtitle, reuseIdentifier: "trackingCell")
-                cell.textLabel?.text = String(format: UIConstants.strings.trackingProtectionLabel)
-                cell.accessibilityIdentifier = "settingsViewController.trackingCell"
-                cell.accessoryType = .disclosureIndicator
             } else {
                 cell = UITableViewCell(style: .subtitle, reuseIdentifier: "toggleCell")
                 let toggle = toggleForIndexPath(indexPath)
@@ -421,22 +403,10 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
                 cell.detailTextLabel?.text = toggle.subtitle
                 cell.detailTextLabel?.numberOfLines = 0
                 cell.selectionStyle = .none
-                if toggle.label == UIConstants.strings.labelSendAnonymousUsageData {
-                    let selector = #selector(tappedLearnMoreFooter)
-                    let learnMore = NSAttributedString(string: UIConstants.strings.learnMore, attributes: [.foregroundColor : UIConstants.colors.settingsLink])
-                    let space = NSAttributedString(string: " ", attributes: [:])
-                    guard let subtitle = toggle.subtitle else { return cell }
-                    let attributedSubtitle = NSMutableAttributedString(string: subtitle)
-                    attributedSubtitle.append(space)
-                    attributedSubtitle.append(learnMore)
-                    cell.detailTextLabel?.attributedText = attributedSubtitle
-                    let tapGesture = UITapGestureRecognizer(target: self, action: selector)
-                    cell.addGestureRecognizer(tapGesture)
-                }
             }
         }
 
-        cell.backgroundColor = UIConstants.colors.cellBackground
+        cell.backgroundColor = UIConstants.colors.background
         cell.textLabel?.textColor = UIConstants.colors.settingsTextLabel
         cell.layoutMargins = UIEdgeInsets.zero
         cell.detailTextLabel?.textColor = UIConstants.colors.settingsDetailLabel
@@ -457,7 +427,7 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
 
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         // Height for the Search Engine and Learn More row.
-        if indexPath.section == 0 { return UITableView.automaticDimension }
+        if indexPath.section == 0 { return UITableViewAutomaticDimension }
         if indexPath.section == 5 ||
             (indexPath.section == 4 && indexPath.row >= 1) {
             return 44
@@ -481,16 +451,16 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
 
     private func heightForLabel(_ label: UILabel, width: CGFloat, text: String) -> CGFloat {
         let size = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
-        let attrs: [NSAttributedString.Key: Any] = [.font: label.font]
+        let attrs: [NSAttributedStringKey: Any] = [.font: label.font]
         let boundingRect = NSString(string: text).boundingRect(with: size, options: NSStringDrawingOptions.usesLineFragmentOrigin, attributes: attrs, context: nil)
         return boundingRect.height
     }
 
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        var groupingOffset = UIConstants.layout.settingsDefaultTitleOffset
+        var groupingOffset = 16
         
-        if sections[section] == .privacy {
-            groupingOffset = UIConstants.layout.settingsFirstTitleOffset
+        if sections[section] == .search {
+            groupingOffset = 3
         }
 
         // Hack: We want the header view's margin to match the cells, so we create an empty
@@ -510,60 +480,55 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
             make.leading.trailing.equalTo(cell.textLabel!)
             make.centerY.equalTo(cell.textLabel!).offset(groupingOffset)
         }
+
+        // Hack to cover header separator line
+        let footer = UIView()
+        footer.backgroundColor = UIConstants.colors.background
+
+        cell.addSubview(footer)
+        cell.sendSubview(toBack: footer)
+
+        footer.snp.makeConstraints { make in
+            make.height.equalTo(1)
+            make.bottom.equalToSuperview().offset(1)
+            make.leading.trailing.equalToSuperview()
+        }
+
         return cell
     }
 
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        return sections[section] == .privacy ? 50 : 30
+        return sections[section] != .search ? 50 : 30
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         switch sections[indexPath.section] {
-        case .privacy:
-            if indexPath.row == 0 {
-                let trackingProtectionVC = TrackingProtectionViewController()
-                navigationController?.pushViewController(trackingProtectionVC, animated: true)
-            }
-        case .search:
-            if indexPath.row == 0 {
-                let searchSettingsViewController = SearchSettingsViewController(searchEngineManager: searchEngineManager)
-                searchSettingsViewController.delegate = self
-                navigationController?.pushViewController(searchSettingsViewController, animated: true)
-            } else if indexPath.row == 1 {
-                let autcompleteSettingViewController = AutocompleteSettingViewController()
-                navigationController?.pushViewController(autcompleteSettingViewController, animated: true)
-            }
-        case .siri:
-            guard #available(iOS 12.0, *) else { return }
-            if indexPath.row == 0 {
-                SiriShortcuts().manageSiri(for: SiriShortcuts.activityType.erase, in: self)
-                UserDefaults.standard.set(false, forKey: TipManager.TipKey.siriEraseTip)
-            }
-            else if indexPath.row == 1 {
-                SiriShortcuts().manageSiri(for: SiriShortcuts.activityType.eraseAndOpen, in: self)
-                UserDefaults.standard.set(false, forKey: TipManager.TipKey.siriEraseTip)
-            }
-            else {
-                let siriFavoriteVC = SiriFavoriteViewController()
-                navigationController?.pushViewController(siriFavoriteVC, animated: true)
-            }
-        case .mozilla:
-            if indexPath.row == 0 {
-                aboutClicked()
-            } else if indexPath.row == 1 {
-                let appId = AppInfo.config.appId
-                if let reviewURL = URL(string: "https://itunes.apple.com/app/id\(appId)?action=write-review"), UIApplication.shared.canOpenURL(reviewURL) {
-                    UIApplication.shared.open(reviewURL, options: [:], completionHandler: nil)
+            case .search:
+                if indexPath.row == 0 {
+                    let searchSettingsViewController = SearchSettingsViewController(searchEngineManager: searchEngineManager)
+                    searchSettingsViewController.delegate = self
+                    navigationController?.pushViewController(searchSettingsViewController, animated: true)
+                } else if indexPath.row == 1 {
+                    let autcompleteSettingViewController = AutocompleteSettingViewController()
+                    navigationController?.pushViewController(autcompleteSettingViewController, animated: true)
                 }
-            }
-        default: break
+            case .mozilla:
+                if indexPath.row == 1 {
+                    aboutClicked()
+                } else if indexPath.row == 2 {
+                    let appId = AppInfo.config.appId
+                    if let reviewURL = URL(string: "https://itunes.apple.com/app/id\(appId)?action=write-review"), UIApplication.shared.canOpenURL(reviewURL) {
+                        UIApplication.shared.open(reviewURL, options: [:], completionHandler: nil)
+                    }
+                }
+            default: break
         }
     }
 
     private func updateSafariEnabledState() {
-        guard let safariIndex = toggles.first(where: { $1.setting ==  SettingsToggle.safari})?.key,
-            let safariToggle = toggles[safariIndex]?.toggle else { return }
+        let safariToggle = self.toggles.first { $0.setting == .safari }!.toggle
+
         safariToggle.isEnabled = false
 
         detector.detectEnabled(view) { [weak self] enabled in
@@ -573,10 +538,6 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
         }
     }
 
-    @objc private func dismissSettings() {
-        self.dismiss(animated: true, completion: nil)
-    }
-
     @objc private func aboutClicked() {
         navigationController!.pushViewController(AboutViewController(), animated: true)
     }
@@ -584,14 +545,14 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
     @objc private func whatsNewClicked() {
         highlightsButton?.tintColor = UIColor.white
         
-        guard let url = SupportUtils.URLForTopic(topic: "whats-new-focus-ios-7") else { return }
+        guard let url = SupportUtils.URLForTopic(topic: "whats-new-focus-ios-6") else { return }
         navigationController?.pushViewController(SettingsContentViewController(url: url), animated: true)
         
         whatsNew.didShowWhatsNew()
     }
 
     @objc private func toggleSwitched(_ sender: UISwitch) {
-        let toggle = toggles.values.filter { $0.toggle == sender }.first!
+        let toggle = toggles.filter { $0.toggle == sender }.first!
 
         func updateSetting() {
             let telemetryEvent = TelemetryEvent(category: TelemetryEventCategory.action, method: TelemetryEventMethod.change, object: "setting", value: toggle.setting.rawValue)
@@ -602,14 +563,12 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
             ContentBlockerHelper.shared.reload()
             Utils.reloadSafariContentBlocker()
         }
-        
+
         // First check if the user changed the anonymous usage data setting and follow that choice right
         // here. Otherwise it will be delayed until the application restarts.
         if toggle.setting == .sendAnonymousUsageData {
             Telemetry.default.configuration.isCollectionEnabled = sender.isOn
             Telemetry.default.configuration.isUploadEnabled = sender.isOn
-        } else if toggle.setting == .biometricLogin {
-            UserDefaults.standard.set(false, forKey: TipManager.TipKey.biometricTip)
         }
 
         switch toggle.setting {
@@ -617,6 +576,18 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
             let instructionsViewController = SafariInstructionsViewController()
             navigationController!.pushViewController(instructionsViewController, animated: true)
             updateSetting()
+        case .blockOther where sender.isOn:
+            let alertController = UIAlertController(title: nil, message: UIConstants.strings.settingsBlockOtherMessage, preferredStyle: .alert)
+            alertController.addAction(UIAlertAction(title: UIConstants.strings.settingsBlockOtherNo, style: UIAlertActionStyle.default) { _ in
+                sender.isOn = false
+                updateSetting()
+            })
+            alertController.addAction(UIAlertAction(title: UIConstants.strings.settingsBlockOtherYes, style: UIAlertActionStyle.destructive) { _ in
+                updateSetting()
+            })
+            alertController.popoverPresentationController?.sourceView = sender
+            alertController.popoverPresentationController?.sourceRect = sender.bounds
+            present(alertController, animated: true, completion: nil)
         default:
             updateSetting()
         }
@@ -625,33 +596,20 @@ class SettingsViewController: UIViewController, UITableViewDataSource, UITableVi
 
 extension SettingsViewController: SearchSettingsViewControllerDelegate {
     func searchSettingsViewController(_ searchSettingsViewController: SearchSettingsViewController, didSelectEngine engine: SearchEngine) {
-        (tableView.cellForRow(at: IndexPath(row: 0, section: 0)) as? SettingsTableViewAccessoryCell)?.accessoryLabelText = engine.name
+        (tableView.cellForRow(at: IndexPath(row: 0, section: 0)) as? SettingsTableViewSearchCell)?.accessoryLabelText = engine.name
     }
 }
 
-extension SettingsViewController: INUIAddVoiceShortcutViewControllerDelegate {
-    @available(iOS 12.0, *)
-    func addVoiceShortcutViewController(_ controller: INUIAddVoiceShortcutViewController, didFinishWith voiceShortcut: INVoiceShortcut?, error: Error?) {
-        controller.dismiss(animated: true, completion: nil)
-    }
-    
-    @available(iOS 12.0, *)
-    func addVoiceShortcutViewControllerDidCancel(_ controller: INUIAddVoiceShortcutViewController) {
-        controller.dismiss(animated: true, completion: nil)
-    }
-}
+private class BlockerToggle {
+    let toggle = UISwitch()
+    let label: String
+    let setting: SettingsToggle
+    let subtitle: String?
 
-@available(iOS 12.0, *)
-extension SettingsViewController: INUIEditVoiceShortcutViewControllerDelegate {
-    func editVoiceShortcutViewController(_ controller: INUIEditVoiceShortcutViewController, didUpdate voiceShortcut: INVoiceShortcut?, error: Error?) {
-        controller.dismiss(animated: true, completion: nil)
-    }
-    
-    func editVoiceShortcutViewController(_ controller: INUIEditVoiceShortcutViewController, didDeleteVoiceShortcutWithIdentifier deletedVoiceShortcutIdentifier: UUID) {
-        controller.dismiss(animated: true, completion: nil)
-    }
-    
-    func editVoiceShortcutViewControllerDidCancel(_ controller: INUIEditVoiceShortcutViewController) {
-        controller.dismiss(animated: true, completion: nil)
+    init(label: String, setting: SettingsToggle, subtitle: String? = nil) {
+        self.label = label
+        self.setting = setting
+        self.subtitle = subtitle
+        toggle.accessibilityIdentifier = "BlockerToggle.\(setting.rawValue)"
     }
 }

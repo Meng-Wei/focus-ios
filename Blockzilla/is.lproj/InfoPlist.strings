@@ -2,7 +2,7 @@
 "NSCameraUsageDescription" = "Hér getur þú tekið og hlaðið upp myndum.";
 
 /* (No Comment) */
-"NSFaceIDUsageDescription" = "Með þessu aflæsir þú smáforritinu.";
+"NSFaceIDUsageDescription" = "This lets you unlock the app.";
 
 /* (No Comment) */
 "NSLocationWhenInUseUsageDescription" = "Vefsvæði sem þú skoðar gætu beðið um staðsetninguna þína.";
